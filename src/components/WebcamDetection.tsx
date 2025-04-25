@@ -13,13 +13,6 @@ import {
   drawFaceAnalysisBox, 
   drawNoseHeightIndicator 
 } from './FaceAnalysisBox';
-import IconButton from "@mui/material/IconButton";
-import Videocam from "@mui/icons-material/Videocam";
-import VideocamOff from "@mui/icons-material/VideocamOff";
-import { FaceLandmarkerResult } from "@mediapipe/tasks-vision";
-import { drawConnectors } from "@mediapipe/drawing_utils";
-import styles from './WebcamDetection.module.css';
-import FeaturesContainer from "./FeaturesContainer";
 
 // 새로운 카테고리 정의 및 매핑
 interface FeatureItem {
