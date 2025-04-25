@@ -13,6 +13,7 @@ import {
   drawFaceAnalysisBox, 
   drawNoseHeightIndicator 
 } from './FaceAnalysisBox';
+import AnalysisButton from './AnalysisButton';
 
 // 새로운 카테고리 정의 및 매핑
 interface FeatureItem {
@@ -123,6 +124,7 @@ const WebcamDetection: React.FC = () => {
   
   // 뷰포트 높이 관리
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   
   // 양쪽 눈 기울기 차가 3도 이내일 때의 데이터를 저장하는 상태
   const [optimalFaceData, setOptimalFaceData] = useState<FaceFeatures | null>(null);
@@ -135,21 +137,28 @@ const WebcamDetection: React.FC = () => {
   const [tapCount, setTapCount] = useState(0);
   const [sectionsVisible, setSectionsVisible] = useState(false);
 
+  // 디바이스 타입 상태 (모바일/데스크톱)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
   // 저장된 데이터를 result로 참조
   const result = optimalFaceData;
 
   // 브라우저 높이 변경시 비디오 크기 조정 함수
   const updateViewportHeight = () => {
     const newHeight = window.innerHeight;
-    console.log('현재 브라우저 높이:', newHeight);
+    const newWidth = window.innerWidth;
+    console.log('현재 브라우저 크기:', newWidth, 'x', newHeight);
     setViewportHeight(newHeight);
+    setViewportWidth(newWidth);
     
     // 모바일 환경인지 확인 (화면 너비가 768px 이하)
-    const isMobile = window.innerWidth <= 768;
+    const mobile = window.innerWidth <= 768;
+    setIsMobile(mobile);
     
-    if (isMobile) {
+    if (mobile) {
       if (containerRef.current) {
         containerRef.current.style.height = `${newHeight}px`;
+        containerRef.current.style.backgroundColor = '#000';
       }
       
       if (videoRef.current) {
@@ -167,6 +176,11 @@ const WebcamDetection: React.FC = () => {
           section.style.maxHeight = `${newHeight * 0.4}px`; // 화면의 40%로 제한
         }
       });
+    } else {
+      // PC 환경에서의 스타일 조정
+      if (containerRef.current) {
+        containerRef.current.style.backgroundColor = '#fff';
+      }
     }
   };
   
@@ -1390,12 +1404,24 @@ const WebcamDetection: React.FC = () => {
     ));
   };
 
+  // Analysis 버튼 클릭 핸들러
+  const handleAnalysisClick = () => {
+    // 분석 버튼 클릭 시 처리할 로직
+    setResultExpanded(true);
+  };
+
   return (
     <div 
       className="mobile-container" 
       ref={containerRef} 
       style={{ 
-        height: window.innerWidth <= 768 ? `${viewportHeight}px` : 'auto'
+        height: isMobile ? `${viewportHeight}px` : '100vh',
+        backgroundColor: isMobile ? '#000' : '#fff',
+        minHeight: '100vh',
+        display: isMobile ? 'block' : 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center'
       }}
     >
       <style>
@@ -1412,7 +1438,6 @@ const WebcamDetection: React.FC = () => {
         .mobile-container {
           width: 100%;
           overflow: hidden;
-          background-color: #000;
         }
         
         /* 모바일일 때 */
@@ -1422,6 +1447,20 @@ const WebcamDetection: React.FC = () => {
             top: 0;
             left: 0;
             width: 100vw;
+            background-color: #000;
+          }
+        }
+        
+        /* PC 모드일 때 */
+        @media (min-width: 769px) {
+          .mobile-container {
+            background-color: #fff;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
           }
         }
         
@@ -1430,7 +1469,6 @@ const WebcamDetection: React.FC = () => {
           position: relative;
           width: 100%;
           height: 100%;
-          background-color: #000;
           overflow: hidden;
           display: flex;
           justify-content: center;
@@ -1444,9 +1482,20 @@ const WebcamDetection: React.FC = () => {
             top: 0;
             left: 0;
             height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background-color: #000;
+          }
+        }
+        
+        /* PC 모드일 때 */
+        @media (min-width: 769px) {
+          .webcam-container {
+            position: relative;
+            width: 400px;
+            height: 800px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            background-color: #000;
+            margin: auto;
           }
         }
         
@@ -1474,6 +1523,18 @@ const WebcamDetection: React.FC = () => {
             width: 100%;
             height: 100%;
             object-fit: contain;
+          }
+        }
+        
+        /* PC 모드일 때 */
+        @media (min-width: 769px) {
+          #webcam {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
           }
         }
         
@@ -1519,6 +1580,18 @@ const WebcamDetection: React.FC = () => {
           }
         }
         
+        /* PC 모드일 때 결과 섹션 */
+        @media (min-width: 769px) {
+          .collapsible-section {
+            position: relative;
+            width: 400px;
+            margin: 8px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+          }
+        }
+        
         /* 섹션 제목 */
         .section-title {
           margin: 0;
@@ -1556,40 +1629,6 @@ const WebcamDetection: React.FC = () => {
           padding-top: 0;
           padding-bottom: 0;
           overflow: hidden;
-        }
-        
-        /* 데스크톱 모드 */
-        @media (min-width: 769px) {
-          .mobile-container {
-            height: auto !important;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-          }
-          
-          .webcam-container {
-            position: relative;
-            width: 100%;
-            max-width: 460px;
-            height: auto !important;
-          }
-          
-          #webcam {
-            position: relative;
-            width: 100%;
-            height: auto !important;
-          }
-          
-          .output_canvas {
-            width: 100%;
-            height: 100% !important;
-          }
-          
-          .collapsible-section {
-            position: relative;
-            max-width: 460px;
-          }
         }
         
         /* 그 외 스타일 유지 */
@@ -1698,13 +1737,14 @@ const WebcamDetection: React.FC = () => {
       <div 
         className="webcam-container" 
         style={{ 
-          height: window.innerWidth <= 768 ? `${viewportHeight}px` : 'auto'
+          height: isMobile ? `${viewportHeight}px` : '800px'
         }}
       >
         <div 
           className="video-wrapper" 
           style={{ 
-            height: window.innerWidth <= 768 ? `${viewportHeight}px` : 'auto'
+            height: isMobile ? `${viewportHeight}px` : '100%',
+            position: 'relative' // 추가
           }}
         >
           <video 
@@ -1714,8 +1754,8 @@ const WebcamDetection: React.FC = () => {
             muted
             ref={videoRef}
             style={{ 
-              height: window.innerWidth <= 768 ? `${viewportHeight}px` : 'auto',
-              objectFit: 'contain'
+              height: isMobile ? `${viewportHeight}px` : '100%',
+              objectFit: isMobile ? 'contain' : 'cover'
             }}
           ></video>
           <canvas 
@@ -1727,9 +1767,15 @@ const WebcamDetection: React.FC = () => {
               top: 0,
               left: 0,
               width: '100%',
-              height: window.innerWidth <= 768 ? `${viewportHeight}px` : '100%'
+              height: isMobile ? `${viewportHeight}px` : '100%'
             }}
           ></canvas>
+          
+          {/* 카메라 화면 위에 버튼 추가 */}
+          <AnalysisButton 
+            show={!!optimalFaceData} 
+            onClick={handleAnalysisClick} 
+          />
         </div>
       </div>
 
@@ -1791,7 +1837,7 @@ const WebcamDetection: React.FC = () => {
       )}
       
       {/* 실시간 측정 데이터 섹션 */}
-      <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`} style={{ bottom: result ? 'auto' : 0 }}>
+      <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`} style={{ bottom: result && isMobile ? 'auto' : 0 }}>
         <h4 
           className={`section-title ${graphExpanded ? '' : 'collapsed'}`}
           onClick={() => setGraphExpanded(!graphExpanded)}
