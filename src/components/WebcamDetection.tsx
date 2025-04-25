@@ -130,6 +130,10 @@ const WebcamDetection: React.FC = () => {
   // 결과 섹션과 그래프 섹션의 표시 상태 관리
   const [resultExpanded, setResultExpanded] = useState(false);
   const [graphExpanded, setGraphExpanded] = useState(false);
+  
+  // 히든 기능: 탭 카운트와 섹션 표시 상태
+  const [tapCount, setTapCount] = useState(0);
+  const [sectionsVisible, setSectionsVisible] = useState(false);
 
   // 저장된 데이터를 result로 참조
   const result = optimalFaceData;
@@ -193,6 +197,31 @@ const WebcamDetection: React.FC = () => {
       window.removeEventListener('scroll', handleResize);
       window.removeEventListener('orientationchange', handleResize);
       window.removeEventListener('load', handleResize);
+    };
+  }, []);
+
+  // 화면 탭/클릭 이벤트 처리를 위한 useEffect
+  useEffect(() => {
+    const handleTap = () => {
+      setTapCount(prevCount => {
+        const newCount = prevCount + 1;
+        if (newCount >= 10) {
+          setSectionsVisible(true);
+          return 0; // 카운트 리셋
+        }
+        return newCount;
+      });
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('click', handleTap);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('click', handleTap);
+      }
     };
   }, []);
 
@@ -1467,6 +1496,13 @@ const WebcamDetection: React.FC = () => {
           z-index: 10;
           max-width: 460px;
           margin: 0 auto;
+          transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .hidden-section {
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
         }
         
         /* 모바일일 때 결과 섹션 */
@@ -1478,7 +1514,7 @@ const WebcamDetection: React.FC = () => {
             width: 100%;
             max-width: 100%;
             z-index: 100;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
             margin: 0;
           }
         }
@@ -1699,7 +1735,7 @@ const WebcamDetection: React.FC = () => {
 
       {/* 측정 결과 섹션 */}
       {result && (
-        <div className="collapsible-section">
+        <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`}>
           <h4 
             className={`section-title ${resultExpanded ? '' : 'collapsed'}`}
             onClick={() => setResultExpanded(!resultExpanded)}
@@ -1755,7 +1791,7 @@ const WebcamDetection: React.FC = () => {
       )}
       
       {/* 실시간 측정 데이터 섹션 */}
-      <div className="collapsible-section" style={{ bottom: result ? 'auto' : 0 }}>
+      <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`} style={{ bottom: result ? 'auto' : 0 }}>
         <h4 
           className={`section-title ${graphExpanded ? '' : 'collapsed'}`}
           onClick={() => setGraphExpanded(!graphExpanded)}
