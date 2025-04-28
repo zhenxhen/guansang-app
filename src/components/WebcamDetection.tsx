@@ -14,6 +14,8 @@ import {
   drawNoseHeightIndicator 
 } from './FaceAnalysisBox';
 import AnalysisButton from './AnalysisButton';
+import ResultCard from './ResultCard';
+import { createGlobalStyle } from 'styled-components';
 
 // 새로운 카테고리 정의 및 매핑
 interface FeatureItem {
@@ -109,6 +111,15 @@ function getContrastYIQ(hexcolor: string): string {
   return (yiq >= 128) ? 'black' : 'white';
 }
 
+// 전역 스타일 설정
+const GlobalStyle = createGlobalStyle`
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  
+  * {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  }
+`;
+
 const WebcamDetection: React.FC = () => {
   const [faceLandmarkerLoaded, setFaceLandmarkerLoaded] = useState(false);
   const [webcamRunning, setWebcamRunning] = useState(false);
@@ -139,6 +150,13 @@ const WebcamDetection: React.FC = () => {
 
   // 디바이스 타입 상태 (모바일/데스크톱)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  // 버튼 표시 상태
+  const [showButton, setShowButton] = useState(false);
+  const faceDetectedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 결과 카드 표시 상태
+  const [showResultCard, setShowResultCard] = useState(false);
 
   // 저장된 데이터를 result로 참조
   const result = optimalFaceData;
@@ -250,13 +268,13 @@ const WebcamDetection: React.FC = () => {
       await setRunningMode("VIDEO");
       
       // 높은 해상도와 프레임 레이트를 요청 (모바일 최적화)
-      const constraints = { 
-        video: { 
+      const constraints = {
+        video: {
           facingMode: "user", // 전면 카메라 사용
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30 }
-        } 
+        }
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -282,6 +300,24 @@ const WebcamDetection: React.FC = () => {
     } catch (error) {
       console.error('Error starting webcam:', error);
     }
+  };
+  
+  // 웹캠 중지 함수
+  const stopWebcam = () => {
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      tracks.forEach((track) => {
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    
+    if (requestRef.current) {
+      cancelAnimationFrame(requestRef.current);
+      requestRef.current = null;
+    }
+    
+    setWebcamRunning(false);
   };
 
   useEffect(() => {
@@ -977,8 +1013,16 @@ const WebcamDetection: React.FC = () => {
       // 얼굴이 감지되었는지 확인
       const faceDetected = results.faceLandmarks && results.faceLandmarks.length > 0;
       
-      // 감지 결과가 있으면 저장
+      // 얼굴이 감지되면 5초 타이머 설정
       if (faceDetected) {
+        // 이미 타이머가 실행 중이 아니고 버튼이 표시되지 않은 경우에만 타이머 설정
+        if (!faceDetectedTimeoutRef.current && !showButton) {
+          faceDetectedTimeoutRef.current = setTimeout(() => {
+            setShowButton(true);
+            faceDetectedTimeoutRef.current = null;
+          }, 5000);
+        }
+        
         // 기존 결과에 계산된 얼굴 특성 추가
         const faceFeatures = calculateFaceFeatures(results.faceLandmarks);
         
@@ -1406,560 +1450,602 @@ const WebcamDetection: React.FC = () => {
 
   // Analysis 버튼 클릭 핸들러
   const handleAnalysisClick = () => {
-    // 분석 버튼 클릭 시 처리할 로직
-    setResultExpanded(true);
+    // 웹캠 중지
+    stopWebcam();
+    
+    // 결과 카드 표시
+    setShowResultCard(true);
   };
 
+  // 다시 찍기 버튼 클릭 핸들러
+  const handleRetake = () => {
+    // 결과 카드 숨기기
+    setShowResultCard(false);
+    
+    // 다시 웹캠 시작
+    startWebcam();
+  };
+
+  // 카드 저장 핸들러
+  const handleSaveCard = () => {
+    // 저장은 ResultCard 컴포넌트에서 처리됨
+    console.log('카드가 저장되었습니다.');
+  };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (faceDetectedTimeoutRef.current) {
+        clearTimeout(faceDetectedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 결과 카드 페이지가 표시 중이면 메인 컴포넌트 대신 결과 카드 표시
+  if (showResultCard && result) {
+    return (
+      <ResultCard 
+        result={result}
+        onRetake={handleRetake}
+        onSave={handleSaveCard}
+      />
+    );
+  }
+
   return (
-    <div 
-      className="mobile-container" 
-      ref={containerRef} 
-      style={{ 
-        height: isMobile ? `${viewportHeight}px` : '100vh',
-        backgroundColor: isMobile ? '#000' : '#fff',
-        minHeight: '100vh',
-        display: isMobile ? 'block' : 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}
-    >
-      <style>
-      {`
-        /* 기본 리셋 */
-        body, html {
-          margin: 0;
-          padding: 0;
-          height: 100%;
-          overflow: hidden;
-        }
-        
-        /* 메인 컨테이너 */
-        .mobile-container {
-          width: 100%;
-          overflow: hidden;
-        }
-        
-        /* 모바일일 때 */
-        @media (max-width: 768px) {
-          .mobile-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            background-color: #000;
-          }
-        }
-        
-        /* PC 모드일 때 */
-        @media (min-width: 769px) {
-          .mobile-container {
-            background-color: #fff;
-            padding: 20px 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-          }
-        }
-        
-        /* 웹캠 컨테이너 */
-        .webcam-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        
-        /* 모바일일 때 */
-        @media (max-width: 768px) {
-          .webcam-container {
-            position: absolute;
-            top: 0;
-            left: 0;
+    <>
+      <GlobalStyle />
+      <div 
+        className="mobile-container" 
+        ref={containerRef} 
+        style={{ 
+          height: isMobile ? `${viewportHeight}px` : '100vh',
+          backgroundColor: isMobile ? '#000' : '#fff',
+          minHeight: '100vh',
+          display: isMobile ? 'block' : 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
+        }}
+      >
+        <style>
+        {`
+          /* 기본 리셋 */
+          body, html {
+            margin: 0;
+            padding: 0;
             height: 100%;
-            background-color: #000;
+            overflow: hidden;
           }
-        }
-        
-        /* PC 모드일 때 */
-        @media (min-width: 769px) {
+          
+          /* 메인 컨테이너 */
+          .mobile-container {
+            width: 100%;
+            overflow: hidden;
+          }
+          
+          /* 모바일일 때 */
+          @media (max-width: 768px) {
+            .mobile-container {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              background-color: #000;
+            }
+          }
+          
+          /* PC 모드일 때 */
+          @media (min-width: 769px) {
+            .mobile-container {
+              background-color: #fff;
+              padding: 20px 0;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+          }
+          
+          /* 웹캠 컨테이너 */
           .webcam-container {
             position: relative;
-            width: 400px;
-            height: 800px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-            background-color: #000;
-            margin: auto;
-          }
-        }
-        
-        /* 비디오 래퍼 */
-        .video-wrapper {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-        }
-        
-        /* 비디오 요소 */
-        #webcam {
-          width: 100%;
-          height: auto;
-          object-fit: contain;
-        }
-        
-        /* 모바일일 때 */
-        @media (max-width: 768px) {
-          #webcam {
-            position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+          
+          /* 모바일일 때 */
+          @media (max-width: 768px) {
+            .webcam-container {
+              position: absolute;
+              top: 0;
+              left: 0;
+              height: 100%;
+              background-color: #000;
+            }
+          }
+          
+          /* PC 모드일 때 */
+          @media (min-width: 769px) {
+            .webcam-container {
+              position: relative;
+              width: 400px;
+              height: 800px;
+              border-radius: 12px;
+              box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+              background-color: #000;
+              margin: auto;
+            }
+          }
+          
+          /* 비디오 래퍼 */
+          .video-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+          }
+          
+          /* 비디오 요소 */
+          #webcam {
+            width: 100%;
+            height: auto;
             object-fit: contain;
           }
-        }
-        
-        /* PC 모드일 때 */
-        @media (min-width: 769px) {
-          #webcam {
+          
+          /* 모바일일 때 */
+          @media (max-width: 768px) {
+            #webcam {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+            }
+          }
+          
+          /* PC 모드일 때 */
+          @media (min-width: 769px) {
+            #webcam {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+          }
+          
+          /* 캔버스 요소 */
+          .output_canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
           }
-        }
-        
-        /* 캔버스 요소 */
-        .output_canvas {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-        }
-        
-        /* 결과 섹션 */
-        .collapsible-section {
-          position: relative;
-          bottom: 0;
-          left: 0;
-          width: 100%;
-          background-color: rgba(255, 255, 255, 0.95);
-          z-index: 10;
-          max-width: 460px;
-          margin: 0 auto;
-          transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        
-        .hidden-section {
-          opacity: 0;
-          visibility: hidden;
-          pointer-events: none;
-        }
-        
-        /* 모바일일 때 결과 섹션 */
-        @media (max-width: 768px) {
+          
+          /* 결과 섹션 */
           .collapsible-section {
-            position: fixed;
+            position: relative;
             bottom: 0;
             left: 0;
             width: 100%;
-            max-width: 100%;
-            z-index: 100;
-            transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.95);
+            z-index: 10;
+            max-width: 460px;
+            margin: 0 auto;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+          }
+          
+          .hidden-section {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+          }
+          
+          /* 모바일일 때 결과 섹션 */
+          @media (max-width: 768px) {
+            .collapsible-section {
+              position: fixed;
+              bottom: 0;
+              left: 0;
+              width: 100%;
+              max-width: 100%;
+              z-index: 100;
+              transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+              margin: 0;
+            }
+          }
+          
+          /* PC 모드일 때 결과 섹션 */
+          @media (min-width: 769px) {
+            .collapsible-section {
+              position: relative;
+              width: 400px;
+              margin: 8px auto;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            }
+          }
+          
+          /* 섹션 제목 */
+          .section-title {
+            margin: 0;
+            padding: 15px;
+            background-color: rgba(240, 240, 240, 0.9);
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          
+          .section-title::after {
+            content: '▼';
+            font-size: 12px;
+            transition: transform 0.3s ease;
+          }
+          
+          .section-title.collapsed::after {
+            transform: rotate(-90deg);
+          }
+          
+          /* 섹션 내용 */
+          .section-content {
+            max-height: 60vh;
+            overflow-y: auto;
+            transition: max-height 0.3s ease;
+            padding: 0 15px;
+          }
+          
+          .section-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            overflow: hidden;
+          }
+          
+          /* 그 외 스타일 유지 */
+          .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 15px 0;
+          }
+
+          .result-label {
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+          }
+
+          .result-value {
+            color: #333;
+            font-size: 14px;
+            text-align: right;
+          }
+
+          .feature-list {
+            list-style: none;
+            padding: 0;
             margin: 0;
           }
-        }
-        
-        /* PC 모드일 때 결과 섹션 */
-        @media (min-width: 769px) {
-          .collapsible-section {
-            position: relative;
-            width: 400px;
-            margin: 8px auto;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+
+          .blend-shapes-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
           }
-        }
+
+          .blend-shapes-label {
+            width: 35%;
+            font-size: 14px;
+          }
+
+          .blend-shapes-value-container {
+            position: relative;
+            width: 45%;
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 0 5px;
+          }
+
+          .zero-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            background-color: #333;
+            z-index: 1;
+          }
+          
+          .blend-shapes-value {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+          }
+
+          .blend-shapes-text {
+            width: 15%;
+            text-align: right;
+            font-size: 14px;
+          }
+
+          .feature-desc {
+            font-size: 12px;
+            color: #777;
+            margin-left: 5px;
+          }
+
+          .color-sample {
+            display: inline-block;
+            width: 80px;
+            height: 24px;
+            border-radius: 4px;
+            margin-left: 10px;
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 2px black;
+            font-size: 12px;
+            line-height: 24px;
+          }
+
+          #no-results-message {
+            text-align: center;
+            margin: 15px;
+            color: #777;
+            font-size: 14px;
+          }
+
+          .test-low { background-color: #FF9800; }
+          .test-medium { background-color: #4CAF50; }
+          .test-high { background-color: #2196F3; }
+        `}
+        </style>
         
-        /* 섹션 제목 */
-        .section-title {
-          margin: 0;
-          padding: 15px;
-          background-color: rgba(240, 240, 240, 0.9);
-          color: #333;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        
-        .section-title::after {
-          content: '▼';
-          font-size: 12px;
-          transition: transform 0.3s ease;
-        }
-        
-        .section-title.collapsed::after {
-          transform: rotate(-90deg);
-        }
-        
-        /* 섹션 내용 */
-        .section-content {
-          max-height: 60vh;
-          overflow-y: auto;
-          transition: max-height 0.3s ease;
-          padding: 0 15px;
-        }
-        
-        .section-content.collapsed {
-          max-height: 0;
-          padding-top: 0;
-          padding-bottom: 0;
-          overflow: hidden;
-        }
-        
-        /* 그 외 스타일 유지 */
-        .result-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          padding: 15px 0;
-        }
-
-        .result-label {
-          font-weight: bold;
-          color: #555;
-          font-size: 14px;
-        }
-
-        .result-value {
-          color: #333;
-          font-size: 14px;
-          text-align: right;
-        }
-
-        .feature-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        .blend-shapes-item {
-          display: flex;
-          align-items: center;
-          margin-bottom: 10px;
-          flex-wrap: wrap;
-        }
-
-        .blend-shapes-label {
-          width: 35%;
-          font-size: 14px;
-        }
-
-        .blend-shapes-value-container {
-          position: relative;
-          width: 45%;
-          height: 10px;
-          background-color: #e0e0e0;
-          border-radius: 5px;
-          overflow: hidden;
-          margin: 0 5px;
-        }
-
-        .zero-line {
-          position: absolute;
-          top: 0;
-          left: 50%;
-          width: 1px;
-          height: 100%;
-          background-color: #333;
-          z-index: 1;
-        }
-        
-        .blend-shapes-value {
-          height: 100%;
-          background-color: #4CAF50;
-          border-radius: 5px;
-          transition: width 0.3s ease;
-        }
-
-        .blend-shapes-text {
-          width: 15%;
-          text-align: right;
-          font-size: 14px;
-        }
-
-        .feature-desc {
-          font-size: 12px;
-          color: #777;
-          margin-left: 5px;
-        }
-
-        .color-sample {
-          display: inline-block;
-          width: 80px;
-          height: 24px;
-          border-radius: 4px;
-          margin-left: 10px;
-          text-align: center;
-          color: white;
-          text-shadow: 0 0 2px black;
-          font-size: 12px;
-          line-height: 24px;
-        }
-
-        #no-results-message {
-          text-align: center;
-          margin: 15px;
-          color: #777;
-          font-size: 14px;
-        }
-
-        .test-low { background-color: #FF9800; }
-        .test-medium { background-color: #4CAF50; }
-        .test-high { background-color: #2196F3; }
-      `}
-      </style>
-      
-      <div 
-        className="webcam-container" 
-        style={{ 
-          height: isMobile ? `${viewportHeight}px` : '800px'
-        }}
-      >
         <div 
-          className="video-wrapper" 
+          className="webcam-container" 
           style={{ 
-            height: isMobile ? `${viewportHeight}px` : '100%',
-            position: 'relative' // 추가
+            height: isMobile ? `${viewportHeight}px` : '800px'
           }}
         >
-          <video 
-            id="webcam" 
-            autoPlay 
-            playsInline
-            muted
-            ref={videoRef}
+          <div 
+            className="video-wrapper" 
             style={{ 
               height: isMobile ? `${viewportHeight}px` : '100%',
-              objectFit: isMobile ? 'contain' : 'cover'
+              position: 'relative' // 추가
             }}
-          ></video>
-          <canvas 
-            className="output_canvas" 
-            id="output_canvas"
-            ref={canvasRef}
-            style={{ 
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: isMobile ? `${viewportHeight}px` : '100%'
-            }}
-          ></canvas>
-          
-          {/* 카메라 화면 위에 버튼 추가 */}
-          <AnalysisButton 
-            show={!!optimalFaceData} 
-            onClick={handleAnalysisClick} 
-          />
-        </div>
-      </div>
-
-      {/* 측정 결과 섹션 */}
-      {result && (
-        <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`}>
-          <h4 
-            className={`section-title ${resultExpanded ? '' : 'collapsed'}`}
-            onClick={() => setResultExpanded(!resultExpanded)}
           >
-            측정 결과
-          </h4>
-          <div className={`section-content ${resultExpanded ? '' : 'collapsed'}`}>
-            <div className="result-grid">
-              <div className="result-label">얼굴 너비-높이 비율:</div>
-              <div className="result-value">{(result.faceRatio * 0.4 + 0.5).toFixed(2)}</div>
-              
-              <div className="result-label">얼굴 대칭성:</div>
-              <div className="result-value">{(result.symmetryScore * 100).toFixed(0)}%</div>
-              
-              <div className="result-label">왼쪽 눈 기울기:</div>
-              <div className="result-value">{result.eyeAngleDeg_L.toFixed(1)}°</div>
-              
-              <div className="result-label">오른쪽 눈 기울기:</div>
-              <div className="result-value">{result.eyeAngleDeg_R.toFixed(1)}°</div>
-              
-              <div className="result-label">눈 사이 거리:</div>
-              <div className="result-value">{result.eyeDistanceRatio.toFixed(2)}</div>
-              
-              <div className="result-label">코 길이:</div>
-              <div className="result-value">{result.noseLength.toFixed(2)}</div>
-              
-              <div className="result-label">코 높이:</div>
-              <div className="result-value">{result.noseHeight.toFixed(2)}</div>
-              
-              <div className="result-label">왼쪽 콧망울 크기:</div>
-              <div className="result-value">{result.nostrilSize_L.toFixed(2)}</div>
-              
-              <div className="result-label">오른쪽 콧망울 크기:</div>
-              <div className="result-value">{result.nostrilSize_R.toFixed(2)}</div>
-              
-              <div className="result-label">아랫입술 두께:</div>
-              <div className="result-value">{result.lowerLipThickness.toFixed(2)}</div>
-              
-              <div className="result-label">왼쪽 눈동자 색상:</div>
-              <div className="result-value">{result.eyeIrisColor_L}</div>
-              
-              <div className="result-label">오른쪽 눈동자 색상:</div>
-              <div className="result-value">{result.eyeIrisColor_R}</div>
-              
-              <div className="result-label">다크서클 색상:</div>
-              <div className="result-value">{result.eyeDarkCircleColor}</div>
-              
-              <div className="result-label">피부 색상:</div>
-              <div className="result-value">{result.skinToneColor}</div>
-            </div>
+            <video 
+              id="webcam" 
+              autoPlay 
+              playsInline
+              muted
+              ref={videoRef}
+              style={{ 
+                height: isMobile ? `${viewportHeight}px` : '100%',
+                objectFit: isMobile ? 'contain' : 'cover'
+              }}
+            ></video>
+            <canvas 
+              className="output_canvas" 
+              id="output_canvas"
+              ref={canvasRef}
+              style={{ 
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: isMobile ? `${viewportHeight}px` : '100%'
+              }}
+            ></canvas>
+            
+            {/* 카메라 화면 위에 버튼 추가 */}
+            <AnalysisButton 
+              show={showButton} 
+              onClick={handleAnalysisClick} 
+            />
           </div>
         </div>
-      )}
-      
-      {/* 실시간 측정 데이터 섹션 */}
-      <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`} style={{ bottom: result && isMobile ? 'auto' : 0 }}>
-        <h4 
-          className={`section-title ${graphExpanded ? '' : 'collapsed'}`}
-          onClick={() => setGraphExpanded(!graphExpanded)}
-        >
-          실시간 측정 데이터
-        </h4>
-        <div className={`section-content ${graphExpanded ? '' : 'collapsed'}`}>
-          <div className="feature-sections">
-            <div className="feature-section">
-              <ul className="feature-list">
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">얼굴 너비-높이 비율</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="face-ratio-bar" className="blend-shapes-value" style={{ width: '0%' }}></div>
-                  </div>
-                  <span id="face-ratio-text" className="blend-shapes-text">0.0</span>
-                  <span className="feature-desc">(가로/세로)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">얼굴 대칭성</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="symmetry-bar" className="blend-shapes-value" style={{ width: '0%' }}></div>
-                  </div>
-                  <span id="symmetry-text" className="blend-shapes-text">0.0%</span>
-                  <span className="feature-desc">(좌우 균형)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">왼쪽 눈 기울기</span>
-                  <div className="blend-shapes-value-container">
-                    <div className="zero-line"></div>
-                    <div id="eye-angle-l-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="eye-angle-l-text" className="blend-shapes-text">0°</span>
-                  <span className="feature-desc">(각도)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">오른쪽 눈 기울기</span>
-                  <div className="blend-shapes-value-container">
-                    <div className="zero-line"></div>
-                    <div id="eye-angle-r-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="eye-angle-r-text" className="blend-shapes-text">0°</span>
-                  <span className="feature-desc">(각도)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">눈 사이 거리</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="eye-distance-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="eye-distance-text" className="blend-shapes-text">1.0</span>
-                  <span className="feature-desc">(기준 대비 비율)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">코 길이</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="nose-length-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="nose-length-text" className="blend-shapes-text">50</span>
-                  <span className="feature-desc">(%)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">코 높이</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="nose-height-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="nose-height-text" className="blend-shapes-text">50</span>
-                  <span className="feature-desc">(%)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">왼쪽 콧망울 크기</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="nostril-size-l-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="nostril-size-l-text" className="blend-shapes-text">1.00</span>
-                  <span className="feature-desc">(비율)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">오른쪽 콧망울 크기</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="nostril-size-r-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="nostril-size-r-text" className="blend-shapes-text">1.00</span>
-                  <span className="feature-desc">(비율)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">아랫입술 두께</span>
-                  <div className="blend-shapes-value-container">
-                    <div id="lower-lip-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
-                  </div>
-                  <span id="lower-lip-text" className="blend-shapes-text">1.00</span>
-                  <span className="feature-desc">(비율)</span>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">왼쪽 눈동자 색상</span>
-                  <div className="color-sample" id="eye-iris-color-l" style={{ backgroundColor: '#000000' }}>#000000</div>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">오른쪽 눈동자 색상</span>
-                  <div className="color-sample" id="eye-iris-color-r" style={{ backgroundColor: '#000000' }}>#000000</div>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">다크서클 색상</span>
-                  <div className="color-sample" id="dark-circle-color" style={{ backgroundColor: '#000000' }}>#000000</div>
-                </li>
-                <li className="blend-shapes-item">
-                  <span className="blend-shapes-label">피부 색상</span>
-                  <div className="color-sample" id="skin-tone-color" style={{ backgroundColor: '#000000' }}>#000000</div>
-                </li>
-              </ul>
+
+        {/* 측정 결과 섹션 */}
+        {result && (
+          <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`}>
+            <h4 
+              className={`section-title ${resultExpanded ? '' : 'collapsed'}`}
+              onClick={() => setResultExpanded(!resultExpanded)}
+            >
+              측정 결과
+            </h4>
+            <div className={`section-content ${resultExpanded ? '' : 'collapsed'}`}>
+              <div className="result-grid">
+                <div className="result-label">얼굴 너비-높이 비율:</div>
+                <div className="result-value">{(result.faceRatio * 0.4 + 0.5).toFixed(2)}</div>
+                
+                <div className="result-label">얼굴 대칭성:</div>
+                <div className="result-value">{(result.symmetryScore * 100).toFixed(0)}%</div>
+                
+                <div className="result-label">왼쪽 눈 기울기:</div>
+                <div className="result-value">{result.eyeAngleDeg_L.toFixed(1)}°</div>
+                
+                <div className="result-label">오른쪽 눈 기울기:</div>
+                <div className="result-value">{result.eyeAngleDeg_R.toFixed(1)}°</div>
+                
+                <div className="result-label">눈 사이 거리:</div>
+                <div className="result-value">{result.eyeDistanceRatio.toFixed(2)}</div>
+                
+                <div className="result-label">코 길이:</div>
+                <div className="result-value">{result.noseLength.toFixed(2)}</div>
+                
+                <div className="result-label">코 높이:</div>
+                <div className="result-value">{result.noseHeight.toFixed(2)}</div>
+                
+                <div className="result-label">왼쪽 콧망울 크기:</div>
+                <div className="result-value">{result.nostrilSize_L.toFixed(2)}</div>
+                
+                <div className="result-label">오른쪽 콧망울 크기:</div>
+                <div className="result-value">{result.nostrilSize_R.toFixed(2)}</div>
+                
+                <div className="result-label">아랫입술 두께:</div>
+                <div className="result-value">{result.lowerLipThickness.toFixed(2)}</div>
+                
+                <div className="result-label">왼쪽 눈동자 색상:</div>
+                <div className="result-value">{result.eyeIrisColor_L}</div>
+                
+                <div className="result-label">오른쪽 눈동자 색상:</div>
+                <div className="result-value">{result.eyeIrisColor_R}</div>
+                
+                <div className="result-label">다크서클 색상:</div>
+                <div className="result-value">{result.eyeDarkCircleColor}</div>
+                
+                <div className="result-label">피부 색상:</div>
+                <div className="result-value">{result.skinToneColor}</div>
+              </div>
             </div>
           </div>
-          
-          <div className="blend-shapes-container">
-            <ul className="blend-shapes-list" id="video-blend-shapes"></ul>
-          </div>
-          
-          <div id="no-results-message" style={{ display: 'none', textAlign: 'center', margin: '20px', color: '#666' }}>
-            얼굴이 인식되지 않았습니다. 카메라 앞에서 정면을 향해 주세요.
+        )}
+        
+        {/* 실시간 측정 데이터 섹션 */}
+        <div className={`collapsible-section ${!sectionsVisible ? 'hidden-section' : ''}`} style={{ bottom: result && isMobile ? 'auto' : 0 }}>
+          <h4 
+            className={`section-title ${graphExpanded ? '' : 'collapsed'}`}
+            onClick={() => setGraphExpanded(!graphExpanded)}
+          >
+            실시간 측정 데이터
+          </h4>
+          <div className={`section-content ${graphExpanded ? '' : 'collapsed'}`}>
+            <div className="feature-sections">
+              <div className="feature-section">
+                <ul className="feature-list">
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">얼굴 너비-높이 비율</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="face-ratio-bar" className="blend-shapes-value" style={{ width: '0%' }}></div>
+                    </div>
+                    <span id="face-ratio-text" className="blend-shapes-text">0.0</span>
+                    <span className="feature-desc">(가로/세로)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">얼굴 대칭성</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="symmetry-bar" className="blend-shapes-value" style={{ width: '0%' }}></div>
+                    </div>
+                    <span id="symmetry-text" className="blend-shapes-text">0.0%</span>
+                    <span className="feature-desc">(좌우 균형)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">왼쪽 눈 기울기</span>
+                    <div className="blend-shapes-value-container">
+                      <div className="zero-line"></div>
+                      <div id="eye-angle-l-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="eye-angle-l-text" className="blend-shapes-text">0°</span>
+                    <span className="feature-desc">(각도)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">오른쪽 눈 기울기</span>
+                    <div className="blend-shapes-value-container">
+                      <div className="zero-line"></div>
+                      <div id="eye-angle-r-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="eye-angle-r-text" className="blend-shapes-text">0°</span>
+                    <span className="feature-desc">(각도)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">눈 사이 거리</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="eye-distance-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="eye-distance-text" className="blend-shapes-text">1.0</span>
+                    <span className="feature-desc">(기준 대비 비율)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">코 길이</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="nose-length-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="nose-length-text" className="blend-shapes-text">50</span>
+                    <span className="feature-desc">(%)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">코 높이</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="nose-height-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="nose-height-text" className="blend-shapes-text">50</span>
+                    <span className="feature-desc">(%)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">왼쪽 콧망울 크기</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="nostril-size-l-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="nostril-size-l-text" className="blend-shapes-text">1.00</span>
+                    <span className="feature-desc">(비율)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">오른쪽 콧망울 크기</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="nostril-size-r-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="nostril-size-r-text" className="blend-shapes-text">1.00</span>
+                    <span className="feature-desc">(비율)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">아랫입술 두께</span>
+                    <div className="blend-shapes-value-container">
+                      <div id="lower-lip-bar" className="blend-shapes-value" style={{ width: '50%' }}></div>
+                    </div>
+                    <span id="lower-lip-text" className="blend-shapes-text">1.00</span>
+                    <span className="feature-desc">(비율)</span>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">왼쪽 눈동자 색상</span>
+                    <div className="color-sample" id="eye-iris-color-l" style={{ backgroundColor: '#000000' }}>#000000</div>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">오른쪽 눈동자 색상</span>
+                    <div className="color-sample" id="eye-iris-color-r" style={{ backgroundColor: '#000000' }}>#000000</div>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">다크서클 색상</span>
+                    <div className="color-sample" id="dark-circle-color" style={{ backgroundColor: '#000000' }}>#000000</div>
+                  </li>
+                  <li className="blend-shapes-item">
+                    <span className="blend-shapes-label">피부 색상</span>
+                    <div className="color-sample" id="skin-tone-color" style={{ backgroundColor: '#000000' }}>#000000</div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="blend-shapes-container">
+              <ul className="blend-shapes-list" id="video-blend-shapes"></ul>
+            </div>
+            
+            <div id="no-results-message" style={{ display: 'none', textAlign: 'center', margin: '20px', color: '#666' }}>
+              얼굴이 인식되지 않았습니다. 카메라 앞에서 정면을 향해 주세요.
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -28,7 +28,9 @@ const ButtonContainer = styled.div<{ show: boolean }>`
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #EAD5A1;
+  background-color: rgba(234, 213, 161, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: white;
   border-radius: 15px;
   font-size: 18px;
@@ -41,6 +43,7 @@ const ButtonContainer = styled.div<{ show: boolean }>`
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   z-index: 1000;
   pointer-events: ${({ show }) => (show ? 'auto' : 'none')};
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
   
   &:active {
     transform: scale(0.98);
