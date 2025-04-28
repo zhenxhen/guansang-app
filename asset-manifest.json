@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/guansang-app/static/css/main.96e1ed0c.css",
-    "main.js": "/guansang-app/static/js/main.134bcb1d.js",
-    "static/js/453.02ff153c.chunk.js": "/guansang-app/static/js/453.02ff153c.chunk.js",
+    "main.css": "/guansang-app/static/css/main.70efdf55.css",
+    "main.js": "/guansang-app/static/js/main.22f462a6.js",
+    "static/js/453.b09f8f57.chunk.js": "/guansang-app/static/js/453.b09f8f57.chunk.js",
     "index.html": "/guansang-app/index.html",
-    "main.96e1ed0c.css.map": "/guansang-app/static/css/main.96e1ed0c.css.map",
-    "main.134bcb1d.js.map": "/guansang-app/static/js/main.134bcb1d.js.map",
-    "453.02ff153c.chunk.js.map": "/guansang-app/static/js/453.02ff153c.chunk.js.map"
+    "main.70efdf55.css.map": "/guansang-app/static/css/main.70efdf55.css.map",
+    "main.22f462a6.js.map": "/guansang-app/static/js/main.22f462a6.js.map",
+    "453.b09f8f57.chunk.js.map": "/guansang-app/static/js/453.b09f8f57.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.96e1ed0c.css",
-    "static/js/main.134bcb1d.js"
+    "static/css/main.70efdf55.css",
+    "static/js/main.22f462a6.js"
   ]
 }
