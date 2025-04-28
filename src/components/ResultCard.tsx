@@ -21,7 +21,7 @@ const GlobalStyle = createGlobalStyle`
 // 화면 크기에 따른 스타일을 정의하는 미디어 쿼리
 const responsiveStyles = {
   extraSmall: {
-    labelSize: '6px',
+    labelSize: '9px',
     valueSize: '10px',
     circleSize: '16px',
     maxWidth: '70px',
@@ -127,8 +127,8 @@ const HeaderSubtitle = styled.h2`
   font-size: 18px;
   color: #9A9A9A;
   font-weight: 600;
-  margin-top: 40px;
-  margin-bottom: -60px;
+  margin-top: 20px;
+  margin-bottom: 0px;
   padding-bottom: 0px;
   font-family: 'Pretendard', sans-serif;
 `;
